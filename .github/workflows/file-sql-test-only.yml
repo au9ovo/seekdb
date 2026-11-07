@@ -78,6 +78,7 @@ jobs:
           export OBMYSQL_PWD=admin
           export OBMYSQL_USR=admin
           export OBSERVER_DIR="$BASE"
+          export FILE_SQL_REPO_ROOT="$REPO_ROOT"
           export IS_BUSINESS=0
           export TENANT=mysql
           cd "$REPO_ROOT/tools/deploy"
