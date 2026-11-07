@@ -54,33 +54,46 @@ jobs:
           chmod +x "$SEEKDB_BINARY" "$CLIENT_ROOT/bin/obclient" "$CLIENT_ROOT/bin/mysqltest"
           export PATH="$CLIENT_ROOT/bin:$PATH"
           export LD_LIBRARY_PATH="$CLIENT_ROOT/lib:$CLIENT_ROOT/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          read CASE_INDEX CASE_COUNT <<<"$(python3 - <<'PY'
-          import sys
-          from pathlib import Path
-
-          sys.path.insert(0, str(Path(".github/script/seekdb").resolve()))
-          import mysqltest_for_seekdb as runner
-
-          cases = runner.discover_cases(Path(".").resolve())
-          for index, case in enumerate(cases):
-              if case.test_file.name == "file_sql_basic.test":
-                  print(index, len(cases))
-                  break
-          else:
-              raise SystemExit("file_sql_basic.test was not discovered")
-          PY
-          )"
-          echo "Running file_sql_basic.test (index $CASE_INDEX of $CASE_COUNT)"
-          python3 .github/script/seekdb/mysqltest_for_seekdb.py run \
-            --seekdb "$SEEKDB_BINARY" \
-            --obclient "$CLIENT_ROOT/bin/obclient" \
-            --mysqltest "$CLIENT_ROOT/bin/mysqltest" \
-            --base-dir "$RUNNER_TEMP/seekdb-file-sql-instance" \
-            --work-dir "$RUNNER_TEMP/seekdb-file-sql-work" \
-            --host 127.0.0.1 \
-            --port 2881 \
-            --slice-index "$CASE_INDEX" \
-            --slice-count "$CASE_COUNT"
+          BASE="$RUNNER_TEMP/seekdb-file-sql-instance"
+          WORK="$RUNNER_TEMP/seekdb-file-sql-work"
+          rm -rf "$BASE" "$WORK"
+          mkdir -p "$WORK/tmp" "$WORK/mysqltest_log"
+          python3 .github/script/seekdb/sdb.py start \
+            --binary "$SEEKDB_BINARY" --base-dir "$BASE" --port 2881
+          trap 'python3 .github/script/seekdb/sdb.py destroy --base-dir "$BASE" >/dev/null 2>&1 || true' EXIT
+          python3 .github/script/seekdb/sdb.py wait-ready \
+            --client "$CLIENT_ROOT/bin/obclient" --base-dir "$BASE" \
+            --host 127.0.0.1 --port 2881 --user root --timeout 600
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uroot -A -c \
+            -Doceanbase < "$PWD/tools/deploy/init.sql"
+          DATA_DIR="$BASE/data_for_mysqltest_file_sql"
+          mkdir -p "$DATA_DIR"
+          cp "$PWD/tools/deploy/mysql_test/test_suite/file_sql/data/"* "$DATA_DIR/"
+          base64 -d "$DATA_DIR/simple.parquet.b64" > "$DATA_DIR/simple.parquet"
+          rm -f "$DATA_DIR/simple.parquet.b64"
+          export OBMYSQL_PORT=2881
+          export OBMYSQL_MS0=127.0.0.1
+          export OBMYSQL_MS0_DEV=127.0.0.1
+          export OBMYSQL_PWD=admin
+          export OBMYSQL_USR=admin
+          export OBSERVER_DIR="$BASE"
+          export IS_BUSINESS=0
+          export TENANT=mysql
+          set +e
+          "$CLIENT_ROOT/bin/mysqltest" \
+            --host=127.0.0.1 --port=2881 --user=admin --password=admin \
+            --database=test --tmpdir="$WORK/tmp" --logdir="$WORK/mysqltest_log" \
+            --silent \
+            --test-file="$PWD/tools/deploy/mysql_test/test_suite/file_sql/t/file_sql_basic.test" \
+            --result-file="$PWD/tools/deploy/mysql_test/test_suite/file_sql/r/mysql/file_sql_basic.result" \
+            --timer-file="$WORK/mysqltest_log/timer" --tail-lines=20
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            mkdir -p "$WORK/failures"
+            cp -a "$BASE/log" "$WORK/failures/seekdb_log" 2>/dev/null || true
+          fi
+          exit "$rc"
 
       - name: Upload file SQL diagnostics
         if: always()
