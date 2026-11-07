@@ -37,11 +37,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y git wget rpm rpm2cpio cpio make build-essential binutils m4 libtool-bin libncurses5 python3
 
-      - name: Build seekdb
-        uses: ./.github/workflows/buildbase
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          save_cache: false
-          os: ubuntu22
+          cache: false
+
+      - name: Initialize release build
+        shell: bash
+        run: |
+          ./build.sh release --init
+          echo "$GITHUB_WORKSPACE/deps/3rd/usr/local/oceanbase/devtools/bin" >> "$GITHUB_PATH"
+
+      - name: Build seekdb
+        shell: bash
+        run: |
+          cd build_release
+          make -j4 seekdb
+          test -x src/observer/seekdb
 
       - name: Run file SQL integration test
         shell: bash
