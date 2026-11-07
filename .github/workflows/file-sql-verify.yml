@@ -1,0 +1,43 @@
+name: File SQL Verify
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch to compile
+        required: true
+        default: feat/file-as-database
+
+jobs:
+  ubuntu-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Free disk space
+        uses: insightsengineering/disk-space-reclaimer@v1
+        with:
+          tools-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+          docker-images: true
+
+      - name: Checkout verification branch
+        uses: actions/checkout@v3
+        with:
+          repository: au9ovo/seekdb
+          ref: ${{ inputs.source_ref }}
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update
+          sudo apt-get install -y git wget rpm rpm2cpio cpio make build-essential binutils m4 libtool-bin libncurses5 python3
+
+      - name: Build seekdb
+        uses: ./.github/workflows/buildbase
+        with:
+          save_cache: false
+          os: ubuntu22
