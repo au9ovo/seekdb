@@ -22,6 +22,13 @@ jobs:
           repository: au9ovo/seekdb
           ref: ${{ inputs.source_ref }}
 
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update
+          sudo apt-get install -y libaio1 libncurses5 python3
+
       - name: Download seekdb runtime
         uses: actions/download-artifact@v4
         with:
