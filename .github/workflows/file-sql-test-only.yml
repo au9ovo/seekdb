@@ -49,8 +49,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SEEKDB_BINARY="$PWD/.seekdb_runtime/seekdb-bin/seekdb"
-          CLIENT_ROOT="$PWD/.seekdb_runtime/obclient"
+          REPO_ROOT="$PWD"
+          SEEKDB_BINARY="$REPO_ROOT/.seekdb_runtime/seekdb-bin/seekdb"
+          CLIENT_ROOT="$REPO_ROOT/.seekdb_runtime/obclient"
           chmod +x "$SEEKDB_BINARY" "$CLIENT_ROOT/bin/obclient" "$CLIENT_ROOT/bin/mysqltest"
           export PATH="$CLIENT_ROOT/bin:$PATH"
           export LD_LIBRARY_PATH="$CLIENT_ROOT/lib:$CLIENT_ROOT/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -65,10 +66,10 @@ jobs:
             --client "$CLIENT_ROOT/bin/obclient" --base-dir "$BASE" \
             --host 127.0.0.1 --port 2881 --user root --timeout 600
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uroot -A -c \
-            -Doceanbase < "$PWD/tools/deploy/init.sql"
+            -Doceanbase < "$REPO_ROOT/tools/deploy/init.sql"
           DATA_DIR="$BASE/data_for_mysqltest_file_sql"
           mkdir -p "$DATA_DIR"
-          cp "$PWD/tools/deploy/mysql_test/test_suite/file_sql/data/"* "$DATA_DIR/"
+          cp "$REPO_ROOT/tools/deploy/mysql_test/test_suite/file_sql/data/"* "$DATA_DIR/"
           base64 -d "$DATA_DIR/simple.parquet.b64" > "$DATA_DIR/simple.parquet"
           rm -f "$DATA_DIR/simple.parquet.b64"
           export OBMYSQL_PORT=2881
@@ -79,13 +80,14 @@ jobs:
           export OBSERVER_DIR="$BASE"
           export IS_BUSINESS=0
           export TENANT=mysql
+          cd "$REPO_ROOT/tools/deploy"
           set +e
           "$CLIENT_ROOT/bin/mysqltest" \
             --host=127.0.0.1 --port=2881 --user=admin --password=admin \
             --database=test --tmpdir="$WORK/tmp" --logdir="$WORK/mysqltest_log" \
             --silent \
-            --test-file="$PWD/tools/deploy/mysql_test/test_suite/file_sql/t/file_sql_basic.test" \
-            --result-file="$PWD/tools/deploy/mysql_test/test_suite/file_sql/r/mysql/file_sql_basic.result" \
+            --test-file="$REPO_ROOT/tools/deploy/mysql_test/test_suite/file_sql/t/file_sql_basic.test" \
+            --result-file="$REPO_ROOT/tools/deploy/mysql_test/test_suite/file_sql/r/mysql/file_sql_basic.result" \
             --timer-file="$WORK/mysqltest_log/timer" --tail-lines=20
           rc=$?
           set -e
