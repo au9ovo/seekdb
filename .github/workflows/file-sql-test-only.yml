@@ -1,0 +1,84 @@
+name: File SQL Test Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Source branch containing the integration test
+        required: true
+        default: feat/file-as-database
+      runtime_run_id:
+        description: Workflow run containing file-sql-seekdb and file-sql-obclient
+        required: true
+
+jobs:
+  file-sql-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v3
+        with:
+          repository: au9ovo/seekdb
+          ref: ${{ inputs.source_ref }}
+
+      - name: Download seekdb runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: file-sql-seekdb
+          path: .seekdb_runtime/seekdb-bin
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.runtime_run_id }}
+
+      - name: Download obclient runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: file-sql-obclient
+          path: .seekdb_runtime/obclient
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.runtime_run_id }}
+
+      - name: Run file SQL integration test
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEEKDB_BINARY="$PWD/.seekdb_runtime/seekdb-bin/seekdb"
+          CLIENT_ROOT="$PWD/.seekdb_runtime/obclient"
+          chmod +x "$SEEKDB_BINARY" "$CLIENT_ROOT/bin/obclient" "$CLIENT_ROOT/bin/mysqltest"
+          export PATH="$CLIENT_ROOT/bin:$PATH"
+          export LD_LIBRARY_PATH="$CLIENT_ROOT/lib:$CLIENT_ROOT/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          read CASE_INDEX CASE_COUNT <<<"$(python3 - <<'PY'
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path(".github/script/seekdb").resolve()))
+          import mysqltest_for_seekdb as runner
+
+          cases = runner.discover_cases(Path(".").resolve())
+          for index, case in enumerate(cases):
+              if case.test_file.name == "file_sql_basic.test":
+                  print(index, len(cases))
+                  break
+          else:
+              raise SystemExit("file_sql_basic.test was not discovered")
+          PY
+          )"
+          echo "Running file_sql_basic.test (index $CASE_INDEX of $CASE_COUNT)"
+          python3 .github/script/seekdb/mysqltest_for_seekdb.py run \
+            --seekdb "$SEEKDB_BINARY" \
+            --obclient "$CLIENT_ROOT/bin/obclient" \
+            --mysqltest "$CLIENT_ROOT/bin/mysqltest" \
+            --base-dir "$RUNNER_TEMP/seekdb-file-sql-instance" \
+            --work-dir "$RUNNER_TEMP/seekdb-file-sql-work" \
+            --host 127.0.0.1 \
+            --port 2881 \
+            --slice-index "$CASE_INDEX" \
+            --slice-count "$CASE_COUNT"
+
+      - name: Upload file SQL diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-sql-test-only-diagnostics
+          path: ${{ runner.temp }}/seekdb-file-sql-work/failures
+          if-no-files-found: ignore

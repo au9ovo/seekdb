@@ -55,6 +55,22 @@ jobs:
           make -j4 seekdb
           test -x src/observer/seekdb
 
+      - name: Save seekdb runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-sql-seekdb
+          path: build_release/src/observer/seekdb
+          if-no-files-found: error
+          compression-level: 1
+
+      - name: Save obclient runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-sql-obclient
+          path: deps/3rd/u01/obclient
+          if-no-files-found: error
+          compression-level: 1
+
       - name: Run file SQL integration test
         shell: bash
         run: |
