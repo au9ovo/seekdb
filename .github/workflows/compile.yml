@@ -4,6 +4,7 @@ on:
   # Compile is temporarily disabled while fixes are pending.
   # Restore the push/pull_request entries below when ready.
   workflow_call:
+  workflow_dispatch:
   # push:
   #   branches: [ master, develop ]
   # pull_request:
