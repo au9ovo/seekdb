@@ -59,6 +59,9 @@ jobs:
           WORK="$RUNNER_TEMP/seekdb-file-sql-work"
           rm -rf "$BASE" "$WORK"
           mkdir -p "$WORK/tmp" "$WORK/mysqltest_log"
+          printf '%s\n' \
+            '1,Alice,1.5,true,2026-08-01,2026-08-01 10:11:12' \
+            '2,Bob,2,false,,' > "$WORK/headerless.csv"
           ulimit -c unlimited
           sudo sysctl -w kernel.core_pattern='core.%p'
           python3 .github/script/seekdb/sdb.py start \
@@ -96,6 +99,15 @@ jobs:
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
             -e "set session enable_file_sql = ON; select substring_index(file, '/', -1) as leaf from glob('$DATA_DIR/*');"
           echo "glob_substring_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select _c1, _c2, _c3, _c4, _c5, _c6 from read_csv('$WORK/headerless.csv', header = false) order by _c1;"
+          echo "headerless_select_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; describe select * from read_csv('$WORK/headerless.csv', header = false);"
+          echo "headerless_describe_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select active, count(*) as row_count, sum(id) as id_sum from read_csv('$DATA_DIR/basic.csv') group by active having sum(id) >= 2 order by active desc limit 2;"
+          echo "group_having_rc=$?"
           COPY_FILE="$WORK/copy_smoke.csv"
           rm -f "$COPY_FILE"
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
