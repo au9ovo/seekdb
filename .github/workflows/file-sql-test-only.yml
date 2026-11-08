@@ -27,7 +27,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update
-          sudo apt-get install -y libaio1 libncurses5 python3
+          sudo apt-get install -y gdb libaio1 libncurses5 python3
 
       - name: Download seekdb runtime
         uses: actions/download-artifact@v4
@@ -59,6 +59,8 @@ jobs:
           WORK="$RUNNER_TEMP/seekdb-file-sql-work"
           rm -rf "$BASE" "$WORK"
           mkdir -p "$WORK/tmp" "$WORK/mysqltest_log"
+          ulimit -c unlimited
+          sudo sysctl -w kernel.core_pattern='core.%p'
           python3 .github/script/seekdb/sdb.py start \
             --binary "$SEEKDB_BINARY" --base-dir "$BASE" --port 2881
           trap 'python3 .github/script/seekdb/sdb.py destroy --base-dir "$BASE" >/dev/null 2>&1 || true' EXIT
@@ -81,6 +83,22 @@ jobs:
           export FILE_SQL_REPO_ROOT="$REPO_ROOT"
           export IS_BUSINESS=0
           export TENANT=mysql
+          set +e
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select count(*) from read_csv('$DATA_DIR/basic.csv');"
+          smoke_rc=$?
+          set -e
+          if [ "$smoke_rc" -ne 0 ]; then
+            mkdir -p "$WORK/failures"
+            cp -a "$BASE/log" "$WORK/failures/seekdb_log" 2>/dev/null || true
+            core_file="$(find "$BASE" -maxdepth 2 -type f -name 'core.*' | head -1)"
+            if [ -n "$core_file" ]; then
+              cp "$core_file" "$WORK/failures/"
+              gdb -batch -ex 'thread apply all bt full' "$SEEKDB_BINARY" "$core_file" \
+                > "$WORK/failures/backtrace.txt" 2>&1 || true
+            fi
+            exit "$smoke_rc"
+          fi
           cd "$REPO_ROOT/tools/deploy"
           set +e
           "$CLIENT_ROOT/bin/mysqltest" \
@@ -95,6 +113,12 @@ jobs:
           if [ "$rc" -ne 0 ]; then
             mkdir -p "$WORK/failures"
             cp -a "$BASE/log" "$WORK/failures/seekdb_log" 2>/dev/null || true
+            core_file="$(find "$BASE" -maxdepth 2 -type f -name 'core.*' | head -1)"
+            if [ -n "$core_file" ]; then
+              cp "$core_file" "$WORK/failures/"
+              gdb -batch -ex 'thread apply all bt full' "$SEEKDB_BINARY" "$core_file" \
+                > "$WORK/failures/backtrace.txt" 2>&1 || true
+            fi
           fi
           exit "$rc"
 
