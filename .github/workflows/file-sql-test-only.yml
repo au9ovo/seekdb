@@ -96,6 +96,14 @@ jobs:
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
             -e "set session enable_file_sql = ON; select substring_index(file, '/', -1) as leaf from glob('$DATA_DIR/*');"
           echo "glob_substring_rc=$?"
+          COPY_FILE="$WORK/copy_smoke.csv"
+          rm -f "$COPY_FILE"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; copy (select id, name from read_csv('$DATA_DIR/basic.csv') order by id) to '$COPY_FILE' (format csv, header, nullstr 'NULL');"
+          echo "copy_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select id, name from read_csv('$COPY_FILE') order by id;"
+          echo "copy_read_rc=$?"
           set -e
           set +e
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
