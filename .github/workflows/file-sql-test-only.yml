@@ -116,6 +116,14 @@ jobs:
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
             -e "set session enable_file_sql = ON; select id, name from read_csv('$COPY_FILE') order by id;"
           echo "copy_read_rc=$?"
+          printf 'sentinel\n' > "$COPY_FILE"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; copy (select id from read_csv('$DATA_DIR/basic.csv')) to '$COPY_FILE' (format csv, header);"
+          echo "copy_exists_rc=$?"
+          echo "copy_exists_content=$(cat "$COPY_FILE")"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; create table file_sql_copy_smoke (id bigint, name varchar(32)); insert into file_sql_copy_smoke values (4, 'Delta'), (5, 'Echo'); copy file_sql_copy_smoke to '$WORK/table_copy_smoke.csv' (format csv, header, nullstr 'NULL'); select id, name from read_csv('$WORK/table_copy_smoke.csv') order by id; drop table file_sql_copy_smoke;"
+          echo "table_copy_rc=$?"
           set -e
           set +e
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
