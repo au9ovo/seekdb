@@ -85,6 +85,20 @@ jobs:
           export TENANT=mysql
           set +e
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select substring_index('/abc/def.csv', '/', -1) as leaf;"
+          echo "substring_index_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select count(*) as file_count from glob('$DATA_DIR/*');"
+          echo "glob_count_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select file from glob('$DATA_DIR/*');"
+          echo "glob_file_rc=$?"
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
+            -e "set session enable_file_sql = ON; select substring_index(file, '/', -1) as leaf from glob('$DATA_DIR/*');"
+          echo "glob_substring_rc=$?"
+          set -e
+          set +e
+          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
             -e "set session enable_file_sql = ON; select count(*) from read_csv('$DATA_DIR/basic.csv');"
           smoke_rc=$?
           set -e
