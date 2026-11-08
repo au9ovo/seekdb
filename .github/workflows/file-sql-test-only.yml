@@ -72,8 +72,6 @@ jobs:
             --host 127.0.0.1 --port 2881 --user root --timeout 600
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uroot -A -c \
             -Doceanbase < "$REPO_ROOT/tools/deploy/init.sql"
-          "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uroot -A -c \
-            -Doceanbase -e "set global ob_enable_plan_cache = OFF;"
           DATA_DIR="$BASE/data_for_mysqltest_file_sql"
           mkdir -p "$DATA_DIR"
           cp "$REPO_ROOT/tools/deploy/mysql_test/test_suite/file_sql/data/"* "$DATA_DIR/"
