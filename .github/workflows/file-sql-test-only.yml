@@ -88,7 +88,7 @@ jobs:
             -e "set session enable_file_sql = ON; select substring_index('/abc/def.csv', '/', -1) as leaf;"
           echo "substring_index_rc=$?"
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
-            -e "set session enable_file_sql = ON; select count(*) as file_count from glob('$DATA_DIR/*');"
+            -e "set session enable_file_sql = ON; set session ob_log_level = 'TRACE'; select count(*) as file_count from glob('$DATA_DIR/*');"
           echo "glob_count_rc=$?"
           "$CLIENT_ROOT/bin/obclient" -h 127.0.0.1 -P 2881 -uadmin -padmin -A -c -Dtest \
             -e "set session enable_file_sql = ON; select file from glob('$DATA_DIR/*');"
